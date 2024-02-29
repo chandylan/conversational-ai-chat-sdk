@@ -20,5 +20,8 @@
     "packages/copilot-studio-direct-to-engine-chat-adapter",
     "packages/copilot-studio-direct-to-engine-proxy",
     "packages/pages"
-  ]
+  ],
+  "dependencies": {
+    "axios": "^1.6.7"
+  }
 }

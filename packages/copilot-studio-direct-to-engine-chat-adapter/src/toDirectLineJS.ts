@@ -17,6 +17,8 @@ import { type ActivityId, type DirectLineJSBotConnection } from './types/DirectL
 
 import axios from 'axios';
 
+type Base64Attachment = Attachment & {content: string};
+
 export default function toDirectLineJS(
   startConversation: ReturnType<typeof createHalfDuplexChatAdapter>
 ): DirectLineJSBotConnection {
@@ -45,36 +47,45 @@ export default function toDirectLineJS(
       return undefined;
     }
 
-    const attachmentsStrings = [];
+    const errorAttachment: Base64Attachment = {
+      contentType: '',
+      contentUrl: '',
+      content: 'error getting attachment from url',
+    }
+
+    const attachmentsBase64: Base64Attachment[] = [];
     for (const attachment of attachments) {
-      // TODO (dylan): is this the right way to do this??? wouldn't it be easier to just read the file directly into a buffer 
-      // instead of going to the trouble of saving it to local storage first??
-      // TODO (dylan): where do we save this URL in the first place??
-      
       // Retrieve the attachment via the attachment's contentUrl
       const url = attachment.contentUrl;
 
       try {
-        // TODO (dylan): is axios the way to do this?
-        // (TODO (dylan): remove) ah, axios response: https://axios-http.com/docs/res_schema
-        // also: axios request config: https://axios-http.com/docs/req_config
-
+        // TODO (dylan): what does this response look like??
         // arraybuffer is necessary for images
         const response = await axios.get(url, { responseType: 'arraybuffer', responseEncoding: 'base64' });
-        // if this doesn't return what you expect, you may need to convert the arraybuffer to a base64 string somehow
-        // TODO (dylan): see if this works, if not try convertToBase64() above:
-        // return convertAxiosResponseStringToBase64(response.data, response.headers['content-type'] === 'application/json');
+        // const response = await axios.get(url, { responseType: 'arraybuffer' });
+        // TODO (dylan): pre-parse JSON specially so it doesn't all render on one line?
+        // if (response.headers['content-type'] === 'application/json') {
+        //   response.data = JSON.parse(response.data, (key, value) => {
+        //     return value && value.type === 'Buffer' ? Buffer.from(value.data) : value;
+        //   });
+        // }
+        const attachmentBase64 = {
+          ...attachment,
+          // content: Buffer.from(response.data.content, 'base64').toString('base64'),
+          content: response.data,
+        }
 
         response.status === 200 ?
-          attachmentsStrings.push(response.data)
+          attachmentsBase64.push(attachmentBase64)
           :
-          attachmentsStrings.push(undefined);
+          attachmentsBase64.push(errorAttachment); // TODO (dylan): should we throw an error?
       } catch (e) {
+        // TODO (dylan): should we throw an error?
         console.error(e);
-        attachmentsStrings.push(undefined);
+        attachmentsBase64.push(errorAttachment);
       }
     }
-    return attachmentsStrings;
+    return attachmentsBase64;
   }
 
   const activityDeferredObservable = new DeferredObservable<Activity>(observer => {
@@ -88,7 +99,7 @@ export default function toDirectLineJS(
 
       let [activities, getExecuteTurn] = iterateWithReturnValue(startConversationPromise);
 
-      for (;;) {
+      for (; ;) {
         for await (const activity of activities) {
           const patchedActivity = await patchActivity(activity);
           observer.next(patchedActivity);
