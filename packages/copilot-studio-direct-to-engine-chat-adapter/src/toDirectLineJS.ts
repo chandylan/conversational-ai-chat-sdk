@@ -32,7 +32,7 @@ export default function toDirectLineJS(
   const patchActivity = async ({ replyToId: _, ...activity }: Activity & { replyToId?: string }): Promise<Activity> => {
     // TODO (dylan): is there a way to only do this conversion if we haven't already done it?
     if (activity.type === 'message') {
-      const attachmentsBase64 = await convertAttachmentsToBase64(activity.attachments as UnknownMedia[]);
+      const attachmentsBase64 = await convertAttachmentsContentToBase64String(activity.attachments as UnknownMedia[]);
       activity.attachments = attachmentsBase64;
     }
     return {
@@ -42,11 +42,12 @@ export default function toDirectLineJS(
     };
   };
 
-  async function convertAttachmentsToBase64(attachments: UnknownMedia[] | undefined) {
+  async function convertAttachmentsContentToBase64String(attachments: UnknownMedia[] | undefined) {
     if (!attachments || attachments.length < 1) {
       return undefined;
     }
 
+    // TODO (dylan): throw an error instead?
     const errorAttachment: Base64Attachment = {
       contentType: '',
       contentUrl: '',
